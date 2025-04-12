@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<title>Дойди до Сериков Клаб</title>
+<style>
+  body {
+    background-image: url('иии (1).png');
+    background-size: cover; 
+    background-position: center; 
+    margin: 0;
+    padding: 0;
+  }
+
+  canvas {
+    display: block;
+    margin: 0 auto;
+    background: #222;
+  }
+
+  #jumpButton {
+    position: absolute;
+    bottom: 20px;
+    right: 20px;
+    padding: 15px 25px;
+    font-size: 18px;
+    border: none;
+    border-radius: 12px;
+    background: orange;
+    color: white;
+    z-index: 10;
+  }
+</style>
+</head>
+<body>
+<button id="jumpButton">Прыжок</button>
+<canvas id="gameCanvas" width="800" height="300"></canvas>
+<script>
+const canvas = document.getElementById("gameCanvas");
+const ctx = canvas.getContext("2d");
+const playerImage = new Image();
+playerImage.src = "пикми.png";
+const goalImage = new Image();
+goalImage.src = "кружка.png";
+
+let player, gravity, obstacles, frame, gameOver, reached, gameSpeed;
+let canJump = true;  // Флаг для предотвращения многократных прыжков
+
+function initGame() {
+  player = { x: 100, y: 200, width: 80, height: 110, vy: 2, jumping: false };
+  gravity = 0.80;
+  obstacles = [];
+  frame = 0;
+  gameOver = false;
+  reached = false;
+  gameSpeed = 4.5; // медленнее, чем было
+}
+
+function drawPlayer() {
+  ctx.fillStyle = "lightgreen";
+  ctx.drawImage(playerImage, player.x, player.y, player.width, player.height);
+}
+
+function drawObstacles() {
+  for (let obj of obstacles) {
+    if (obj.type === "house") {
+      ctx.fillStyle = "brown";
+      ctx.fillRect(obj.x, obj.y, obj.width, obj.height);
+      // крыша
+      ctx.beginPath();
+      ctx.moveTo(obj.x, obj.y);
+      ctx.lineTo(obj.x + obj.width / 2, obj.y - obj.height / 2);
+      ctx.lineTo(obj.x + obj.width, obj.y);
+      ctx.closePath();
+      ctx.fillStyle = "red";
+      ctx.fill();
+    } else if (obj.type === "cup") {
+      // кружка кофе
+      ctx.fillStyle = "white";
+      ctx.beginPath();
+      ctx.arc(obj.x + 10, obj.y + 10, 10, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = "brown";
+      ctx.beginPath();
+      ctx.arc(obj.x + 10, obj.y + 10, 6, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+}
+
+function updateObstacles() {
+  if (frame % 80 === 0) {
+    let isCup = Math.random() < 0.4; // 40% кружки, 60% домики
+    if (isCup) {
+      obstacles.push({
+        x: canvas.width,
+        y: 245,
+        width: 20,
+        height: 20,
+        type: "cup"
+      });
+    } else {
+      obstacles.push({
+        x: canvas.width,
+        y: 235,
+        width: 25,
+        height: 30,
+        type: "house"
+      });
+    }
+  }
+
+  for (let obj of obstacles) {
+    obj.x -= gameSpeed;
+  }
+
+  obstacles = obstacles.filter(o => o.x + o.width > 0);
+}
+
+function checkCollision() {
+  for (let obj of obstacles) {
+    if (
+      player.x < obj.x + obj.width &&
+      player.x + player.width > obj.x &&
+      player.y < obj.y + obj.height &&
+      player.y + player.height > obj.y
+    ) {
+      gameOver = true;
+    }
+  }
+}
+
+function drawGoal() {
+  if (frame > 1500 && !reached) {
+    const goalX = canvas.width - (frame - 1500) * gameSpeed;
+
+    // Отрисовка кружки как цели
+    ctx.drawImage(goalImage, goalX, 130, 160, 160); // Подбери размер, если нужно
+
+    if (player.x + player.width > goalX) {
+      reached = true;
+    }
+  }
+}
+
+function gameLoop() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  if (gameOver) {
+    ctx.fillStyle = "white";
+    ctx.font = "18px Courier New";
+    ctx.fillText("Игра окончена. Нажми пробел, чтобы начать заново", 150, 100);
+    return;
+  }
+
+  if (reached) {
+    ctx.fillStyle = "white";
+    ctx.font = "18px Courier New";
+    ctx.fillText("Ты дошёл до Сериков Клаб! ☕", 230, 80);
+    ctx.fillText("Вы получаете скидку 10% в кофейне Serikov club!", 120, 110);
+    return;
+  }
+
+  // рисуем землю
+  ctx.fillStyle = "#444";
+  ctx.fillRect(0, 260, canvas.width, 5);
+  drawPlayer();
+  drawObstacles();
+  updateObstacles();
+  drawGoal();
+  checkCollision();
+
+  // гравитация
+  player.y += player.vy;
+  player.vy += gravity;
+  if (player.y > 160) {
+    player.y = 160;
+    player.jumping = false;
+    canJump = true;  // Разрешаем следующий прыжок
+  }
+
+  frame++;
+  requestAnimationFrame(gameLoop);
+}
+
+window.addEventListener("keydown", (e) => {
+  if (e.code === "Space") {
+    if (gameOver || reached) {
+      initGame();
+      gameLoop();
+    } else if (canJump && !player.jumping) {
+      canJump = false;  // Блокируем следующий прыжок до тех пор, пока не приземлимся
+      player.vy = -15;  // Прыжок
+      player.jumping = true;
+    }
+  }
+});
+
+// Добавление обработчика для любого касания по экрану
+document.body.addEventListener("touchstart", () => {
+  if (gameOver || reached) {
+    initGame();
+    gameLoop();
+  } else if (canJump && !player.jumping) {
+    canJump = false;  // Блокируем следующий прыжок до тех пор, пока не приземлимся
+    player.vy = -15;  // Прыжок
+    player.jumping = true;
+  }
+});
+
+let imagesLoaded = 0;
+
+playerImage.onload = checkImagesLoaded;
+goalImage.onload = checkImagesLoaded;
+
+function checkImagesLoaded() {
+  imagesLoaded++;
+  if (imagesLoaded === 2) {
+    initGame();
+    gameLoop();
+  }
+}
+</script>
+</body>
+</html>
